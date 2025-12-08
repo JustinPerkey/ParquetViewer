@@ -59,6 +59,25 @@ struct DataPreview {
     column_count: usize,
 }
 
+/// Launches the Parquet viewer command-line application.
+///
+/// # Parameters
+/// * None. The function reads command line arguments using `clap`.
+///
+/// # Returns
+/// A [`Result`] indicating whether the application completed successfully.
+///
+/// # Errors
+/// Returns a [`ViewerError`] when the Parquet preview cannot be loaded or formatted.
+///
+/// # Panics
+/// This function does not intentionally panic.
+///
+/// # Examples
+/// ```ignore
+/// // Run the viewer in headless mode
+/// // parquet-viewer --headless sample.parquet
+/// ```
 fn main() -> Result<(), ViewerError> {
     tracing_subscriber::fmt::init();
 
@@ -80,6 +99,30 @@ fn main() -> Result<(), ViewerError> {
     Ok(())
 }
 
+/// Loads a preview of the Parquet file including metadata and a limited set of rows.
+///
+/// # Parameters
+/// * `path` - Path to the Parquet file.
+/// * `row_limit` - Maximum number of rows to include in the preview.
+///
+/// # Returns
+/// A [`DataPreview`] containing formatted text output, column names, row data, and metadata.
+///
+/// # Errors
+/// Returns a [`ViewerError`] when the file cannot be opened, read, or formatted.
+///
+/// # Panics
+/// This function does not intentionally panic.
+///
+/// # Examples
+/// ```ignore
+/// use parquet_viewer::load_preview;
+/// use std::path::PathBuf;
+///
+/// let preview = load_preview(&PathBuf::from("sample.parquet"), 5)?;
+/// println!("{} rows loaded", preview.rows.len());
+/// # Ok::<(), parquet_viewer::ViewerError>(())
+/// ```
 fn load_preview(path: &PathBuf, row_limit: usize) -> Result<DataPreview, ViewerError> {
     let file = File::open(path)?;
     let metadata = SerializedFileReader::new(file.try_clone()?)?
@@ -109,6 +152,29 @@ fn load_preview(path: &PathBuf, row_limit: usize) -> Result<DataPreview, ViewerE
     })
 }
 
+/// Retrieves the column names from the first record batch in the Parquet file.
+///
+/// # Parameters
+/// * `file` - Opened Parquet file handle.
+///
+/// # Returns
+/// A vector of column names in the order they appear in the schema.
+///
+/// # Errors
+/// Returns a [`ViewerError`] when the file cannot be read or decoded.
+///
+/// # Panics
+/// This function does not intentionally panic.
+///
+/// # Examples
+/// ```ignore
+/// use parquet_viewer::load_columns;
+/// use std::fs::File;
+///
+/// let file = File::open("sample.parquet")?;
+/// let columns = load_columns(&file)?;
+/// # Ok::<(), parquet_viewer::ViewerError>(())
+/// ```
 fn load_columns(file: &File) -> Result<Vec<String>, ViewerError> {
     let mut reader = ParquetRecordBatchReaderBuilder::try_new(file.try_clone()?)?.build()?;
 
@@ -125,6 +191,30 @@ fn load_columns(file: &File) -> Result<Vec<String>, ViewerError> {
     }
 }
 
+/// Reads record batches from a Parquet file using the provided row window.
+///
+/// # Parameters
+/// * `path` - Path to the Parquet file.
+/// * `start` - Starting row index (zero-based) for the selection.
+/// * `limit` - Maximum number of rows to read.
+///
+/// # Returns
+/// A vector of [`RecordBatch`] values containing the selected rows.
+///
+/// # Errors
+/// Returns a [`ViewerError`] when the file cannot be opened or read.
+///
+/// # Panics
+/// This function does not intentionally panic.
+///
+/// # Examples
+/// ```ignore
+/// use parquet_viewer::load_batches;
+/// use std::path::PathBuf;
+///
+/// let batches = load_batches(&PathBuf::from("sample.parquet"), 0, 10)?;
+/// # Ok::<(), parquet_viewer::ViewerError>(())
+/// ```
 fn load_batches(
     path: &PathBuf,
     start: usize,
@@ -148,6 +238,30 @@ fn load_batches(
     Ok(batches)
 }
 
+/// Converts record batches into a two-dimensional vector of row values.
+///
+/// # Parameters
+/// * `batches` - Record batches to convert.
+/// * `row_limit` - Maximum number of rows to include in the output.
+///
+/// # Returns
+/// Rows represented as strings for each column, respecting the provided limit.
+///
+/// # Errors
+/// Returns a [`ViewerError`] when converting any value to a string fails.
+///
+/// # Panics
+/// This function does not intentionally panic.
+///
+/// # Examples
+/// ```ignore
+/// # use arrow::record_batch::RecordBatch;
+/// # let batches: Vec<RecordBatch> = Vec::new();
+/// use parquet_viewer::batches_to_rows;
+///
+/// let rows = batches_to_rows(&batches, 5)?;
+/// # Ok::<(), parquet_viewer::ViewerError>(())
+/// ```
 fn batches_to_rows(
     batches: &[RecordBatch],
     row_limit: usize,
@@ -177,6 +291,27 @@ fn batches_to_rows(
     Ok(rows)
 }
 
+/// Prints a summary of the preview to standard output.
+///
+/// # Parameters
+/// * `preview` - Prepared [`DataPreview`] content to display.
+///
+/// # Panics
+/// This function does not intentionally panic.
+///
+/// # Examples
+/// ```ignore
+/// # use parquet_viewer::{print_to_terminal, DataPreview};
+/// # let preview = DataPreview {
+/// #     path: std::path::PathBuf::new(),
+/// #     formatted_rows: String::new(),
+/// #     columns: Vec::new(),
+/// #     rows: Vec::new(),
+/// #     row_count: 0,
+/// #     column_count: 0,
+/// # };
+/// print_to_terminal(&preview);
+/// ```
 fn print_to_terminal(preview: &DataPreview) {
     println!(
         "Rows: {} | Columns: {}\n",
@@ -186,6 +321,34 @@ fn print_to_terminal(preview: &DataPreview) {
 }
 
 impl DataPreview {
+    /// Loads rows for a given range without exceeding the file boundaries.
+    ///
+    /// # Parameters
+    /// * `range` - Range of rows to fetch from the Parquet file.
+    ///
+    /// # Returns
+    /// A vector of row values represented as strings.
+    ///
+    /// # Errors
+    /// Returns a [`ViewerError`] when the requested rows cannot be read.
+    ///
+    /// # Panics
+    /// This function does not intentionally panic.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// # use parquet_viewer::DataPreview;
+    /// # let preview = DataPreview {
+    /// #     path: std::path::PathBuf::new(),
+    /// #     formatted_rows: String::new(),
+    /// #     columns: Vec::new(),
+    /// #     rows: Vec::new(),
+    /// #     row_count: 0,
+    /// #     column_count: 0,
+    /// # };
+    /// let rows = preview.rows_for_range(0..5)?;
+    /// # Ok::<(), parquet_viewer::ViewerError>(())
+    /// ```
     fn rows_for_range(&self, range: Range<usize>) -> Result<Vec<Vec<String>>, ViewerError> {
         if range.start >= self.row_count {
             return Ok(Vec::new());
@@ -204,10 +367,32 @@ const TABLE_VERTICAL_MARGIN: f32 = 32.0;
 const TABLE_CHROME_HEIGHT: f32 = 180.0;
 const TABLE_BOTTOM_PADDING: f32 = 12.0;
 
+/// Calculates how many rows can be displayed within the provided pixel height.
+///
+/// # Parameters
+/// * `height` - Available vertical space for the table body.
+///
+/// # Returns
+/// The maximum number of complete rows that can fit in the provided height, with a
+/// minimum of one row.
+///
+/// # Panics
+/// This function does not intentionally panic.
 fn rows_per_view(height: Pixels) -> usize {
     ((f32::from(height) / ROW_HEIGHT).floor().max(1.0)) as usize
 }
 
+/// Computes the table height for a window while accounting for chrome and padding.
+///
+/// # Parameters
+/// * `window` - The GPUI window used to derive sizing information.
+///
+/// # Returns
+/// A pixel value indicating how tall the table should be to fit comfortably within the
+/// window.
+///
+/// # Panics
+/// This function does not intentionally panic.
 fn table_height_for_window(window: &gpui::Window) -> Pixels {
     // Use the viewport size so that maximized windows report their actual content
     // height instead of the restore size stored in `window_bounds`.
@@ -219,6 +404,13 @@ fn table_height_for_window(window: &gpui::Window) -> Pixels {
 }
 
 /// Launch a GPUI window that renders the formatted preview.
+///
+/// # Parameters
+/// * `preview` - The prepared preview data to display.
+///
+/// # Panics
+/// This function does not intentionally panic but will propagate any GPUI errors that
+/// cannot be handled internally.
 fn launch_ui(preview: DataPreview) {
     let preview_data = preview.clone();
 
@@ -273,6 +465,15 @@ struct PreviewView {
 }
 
 impl PreviewView {
+    /// Loads rows into the viewport starting from a given index and updates the visible
+    /// range.
+    ///
+    /// # Parameters
+    /// * `start` - The starting row index to display.
+    /// * `cx` - GPUI context used to notify the view when data changes.
+    ///
+    /// # Panics
+    /// This function does not intentionally panic.
     fn load_visible_rows(&mut self, start: usize, cx: &mut gpui::Context<PreviewView>) {
         if self.preview.row_count == 0 {
             self.visible_rows.clear();
@@ -296,6 +497,15 @@ impl PreviewView {
         }
     }
 
+    /// Adjusts the table layout when the window is resized, recalculating the number of
+    /// rows that fit and reloading data when necessary.
+    ///
+    /// # Parameters
+    /// * `window` - The window whose size has changed.
+    /// * `cx` - GPUI context used to trigger rendering updates.
+    ///
+    /// # Panics
+    /// This function does not intentionally panic.
     fn update_rows_for_resize(
         &mut self,
         window: &mut gpui::Window,
@@ -315,6 +525,14 @@ impl PreviewView {
         }
     }
 
+    /// Scrolls the viewport by the requested number of rows while respecting bounds.
+    ///
+    /// # Parameters
+    /// * `delta_rows` - Signed number of rows to move; positive scrolls down.
+    /// * `cx` - GPUI context used to notify after loading new rows.
+    ///
+    /// # Panics
+    /// This function does not intentionally panic.
     fn scroll_view(&mut self, delta_rows: isize, cx: &mut gpui::Context<PreviewView>) {
         if self.preview.row_count == 0 {
             return;
@@ -343,6 +561,17 @@ impl PreviewView {
 }
 
 impl gpui::Render for PreviewView {
+    /// Renders the metadata and table for the preview view.
+    ///
+    /// # Parameters
+    /// * `_window` - The GPUI window for rendering context (unused).
+    /// * `cx` - Context used to access theming and handle events.
+    ///
+    /// # Returns
+    /// A GPUI element representing the composed UI hierarchy for the preview.
+    ///
+    /// # Panics
+    /// This function does not intentionally panic.
     fn render(
         &mut self,
         _window: &mut gpui::Window,
@@ -405,6 +634,17 @@ impl gpui::Render for PreviewView {
     }
 }
 
+/// Builds the table element representing the Parquet preview.
+///
+/// # Parameters
+/// * `view` - Current preview state driving the table contents.
+/// * `cx` - GPUI context used to render and create event listeners.
+///
+/// # Returns
+/// A GPUI element containing table header and rows.
+///
+/// # Panics
+/// This function does not intentionally panic.
 fn render_table(
     view: &mut PreviewView,
     cx: &mut gpui::Context<PreviewView>,
@@ -530,6 +770,19 @@ mod tests {
     use parquet::file::properties::WriterProperties;
     use tempfile::NamedTempFile;
 
+    /// Writes a Parquet file with a simple schema and deterministic rows for testing.
+    ///
+    /// # Parameters
+    /// * `rows` - Number of sequential rows to generate for the dataset.
+    ///
+    /// # Returns
+    /// A [`NamedTempFile`] containing the generated Parquet data.
+    ///
+    /// # Errors
+    /// Returns a [`ViewerError`] when any Parquet serialization step fails.
+    ///
+    /// # Panics
+    /// This function does not intentionally panic.
     fn write_test_parquet(rows: usize) -> Result<NamedTempFile, ViewerError> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int32, false),
@@ -556,12 +809,19 @@ mod tests {
         Ok(file)
     }
 
+    /// Confirms preview metadata matches the written Parquet file contents.
+    ///
+    /// # Panics
+    /// Panics if the Parquet file cannot be written or the preview fails to load.
     #[test]
     fn load_preview_reports_metadata() {
+        // Arrange
         let file = write_test_parquet(4).expect("parquet write should succeed");
 
+        // Act
         let preview = load_preview(&file.path().to_path_buf(), 10).expect("preview should load");
 
+        // Assert
         assert_eq!(preview.row_count, 4);
         assert_eq!(preview.column_count, 2);
         assert!(preview.formatted_rows.contains("id"));
@@ -571,48 +831,72 @@ mod tests {
         assert_eq!(preview.rows[0], vec!["0".to_string(), "name-0".to_string()]);
     }
 
+    /// Ensures the preview respects the requested row limit.
+    ///
+    /// # Panics
+    /// Panics if Parquet serialization or preview loading fails.
     #[test]
     fn load_preview_respects_row_limit() {
+        // Arrange
         let file = write_test_parquet(5).expect("parquet write should succeed");
 
+        // Act
         let preview = load_preview(&file.path().to_path_buf(), 2).expect("preview should load");
 
+        // Assert
         assert!(preview.formatted_rows.contains("name-0"));
         assert!(preview.formatted_rows.contains("name-1"));
         assert!(!preview.formatted_rows.contains("name-2"));
         assert_eq!(preview.rows.len(), 2);
     }
 
+    /// Validates that row retrieval respects requested ranges.
+    ///
+    /// # Panics
+    /// Panics if the preview cannot be generated or rows cannot be fetched.
     #[test]
     fn rows_for_range_fetches_requested_slice() {
+        // Arrange
         let file = write_test_parquet(6).expect("parquet write should succeed");
-
         let preview = load_preview(&file.path().to_path_buf(), 6).expect("preview should load");
 
+        // Act
         let rows = preview
             .rows_for_range(2..5)
             .expect("range fetch should succeed");
 
+        // Assert
         assert_eq!(rows.len(), 3);
         assert_eq!(rows[0], vec!["2".to_string(), "name-2".to_string()]);
         assert_eq!(rows[2], vec!["4".to_string(), "name-4".to_string()]);
     }
 
+    /// Confirms that requesting rows past the end of the file yields an empty result.
+    ///
+    /// # Panics
+    /// Panics if preview generation or row retrieval fails.
     #[test]
     fn rows_for_range_returns_empty_when_start_out_of_bounds() {
+        // Arrange
         let file = write_test_parquet(2).expect("parquet write should succeed");
-
         let preview = load_preview(&file.path().to_path_buf(), 2).expect("preview should load");
 
+        // Act
         let rows = preview
             .rows_for_range(5..8)
             .expect("range fetch should succeed");
 
+        // Assert
         assert!(rows.is_empty());
     }
 
+    /// Verifies that the row conversion utility honors the requested limit.
+    ///
+    /// # Panics
+    /// Panics if building the record batch or converting rows fails.
     #[test]
     fn batches_to_rows_stops_at_limit() {
+        // Arrange
         let schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int32, false),
             Field::new("name", DataType::Utf8, false),
@@ -631,8 +915,10 @@ mod tests {
         )
         .expect("record batch should build");
 
+        // Act
         let rows = batches_to_rows(&[batch], 2).expect("rows should convert");
 
+        // Assert
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0], vec!["1".to_string(), "name-1".to_string()]);
         assert_eq!(rows[1], vec!["2".to_string(), "name-2".to_string()]);
