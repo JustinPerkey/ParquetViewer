@@ -1,0 +1,6 @@
+# AI Contribution Rules
+
+- Write unit tests for all functionality. Structure tests using the Arrange-Act-Assert (AAA) pattern to keep setup, execution, and verification clear.
+- Document every function (public and private) with Rustdoc comments that explain purpose, parameters, return values, panics, and examples when helpful, following standard Rust guidelines.
+- Follow idiomatic Rust practices: prefer clear ownership and borrowing patterns, handle errors robustly, avoid unnecessary cloning, and keep modules cohesive with responsibilities well distributed.
+- Maintain clean, readable code with descriptive names, small focused functions, and adherence to Rust formatting and linting standards.
