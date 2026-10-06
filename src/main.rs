@@ -10,7 +10,7 @@ use gpui::{
     div, prelude::*, px, size, App, Application, Bounds, MouseButton, Pixels, WindowBounds,
     WindowOptions,
 };
-use gpui_component::{ActiveTheme, StyledExt};
+use gpui_component::{scroll::ScrollableElement, ActiveTheme, StyledExt};
 use parquet::arrow::arrow_reader::{ParquetRecordBatchReaderBuilder, RowSelection, RowSelector};
 use parquet::file::reader::FileReader;
 use parquet::file::reader::SerializedFileReader;
@@ -366,6 +366,7 @@ const MIN_TABLE_HEIGHT: f32 = 200.0;
 const TABLE_VERTICAL_MARGIN: f32 = 32.0;
 const TABLE_CHROME_HEIGHT: f32 = 180.0;
 const TABLE_BOTTOM_PADDING: f32 = 12.0;
+const COLUMN_MIN_WIDTH: f32 = 80.0;
 
 /// Calculates how many rows can be displayed within the provided pixel height.
 ///
@@ -650,11 +651,13 @@ fn render_table(
     cx: &mut gpui::Context<PreviewView>,
 ) -> impl gpui::IntoElement {
     let theme = cx.theme();
+    let table_min_width = px(view.preview.column_count as f32 * COLUMN_MIN_WIDTH);
 
     let header = div()
         .flex()
         .flex_row()
         .w_full()
+        .min_w(table_min_width)
         .bg(theme.table_head)
         .text_color(theme.table_head_foreground)
         .border_b_1()
@@ -665,7 +668,7 @@ fn render_table(
                 .py_1()
                 .font_medium()
                 .flex_1()
-                .min_w(px(80.0))
+                .min_w(px(COLUMN_MIN_WIDTH))
                 .border_r_1()
                 .border_color(theme.table_row_border)
                 .child(name.clone())
@@ -681,6 +684,7 @@ fn render_table(
                 .flex()
                 .flex_row()
                 .w_full()
+                .min_w(table_min_width)
                 .border_b_1()
                 .border_color(theme.table_row_border)
                 .children(row.iter().enumerate().map(|(col_index, value)| {
@@ -703,7 +707,7 @@ fn render_table(
                         .px_2()
                         .py_1()
                         .flex_1()
-                        .min_w(px(80.0))
+                        .min_w(px(COLUMN_MIN_WIDTH))
                         .border_r_1()
                         .border_color(if is_selected {
                             theme.table_active_border
@@ -744,17 +748,25 @@ fn render_table(
                 .w_full()
                 .h_full()
                 .font_family("monospace")
-                .child(header)
+                .overflow_x_scrollbar()
                 .child(
                     div()
-                        .h(view.table_height)
-                        .min_h(px(MIN_TABLE_HEIGHT))
-                        .w_full()
-                        .overflow_hidden()
-                        .on_scroll_wheel(scroll_handler)
                         .flex()
                         .flex_col()
-                        .children(rows),
+                        .w_full()
+                        .min_w(table_min_width)
+                        .child(header)
+                        .child(
+                            div()
+                                .h(view.table_height)
+                                .min_h(px(MIN_TABLE_HEIGHT))
+                                .w_full()
+                                .overflow_hidden()
+                                .on_scroll_wheel(scroll_handler)
+                                .flex()
+                                .flex_col()
+                                .children(rows),
+                        ),
                 ),
         )
 }
